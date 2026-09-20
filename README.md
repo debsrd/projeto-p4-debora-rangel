@@ -211,4 +211,26 @@ Estão fora do escopo deste projeto:
 
 - [Casos de Teste](testes/casos.md)
 
+## Estrutura do Repositório
+
+```
+projeto-p4-debora-rangel/
+│
+├── README.md
+│
+├── docs/
+│   ├── problema.md
+│   ├── especificacao.md
+│   ├── decisoes.md
+│   └── comparacao-final.md
+│
+├── testes/
+│   └── casos.md
+│
+├── imperativo/
+├── poo/
+├── funcional/
+├── logico/
+└── integrado/
+```
 
