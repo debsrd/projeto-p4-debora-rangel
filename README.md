@@ -202,4 +202,13 @@ Estão fora do escopo deste projeto:
 
 - **Lógico — Prolog**: linguagem natural para expressar as regras do problema como fatos e regras lógicas, permitindo consultas diretas ao motor de inferência.
 
+## Etapas do Projeto
+
+- [P4-ETAPA-01] Proposta e especificacao do problema — concluida
+- [P4-ETAPA-02] Contrato semantico e testes — concluida
+
+## Links
+
+- [Casos de Teste](testes/casos.md)
+
 
