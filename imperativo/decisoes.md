@@ -2,7 +2,7 @@
 
 **Tag:** `[P4-ETAPA-03]`
 **Linguagem:** C
-**Arquivos:** `imperativo/biblioteca.h`, `imperativo/biblioteca.c`, `imperativo/main.c`, `imperativo/validacao.c`
+**Arquivos:** `imperativo/biblioteca.h`, `imperativo/biblioteca.c`, `imperativo/main.c`
 
 ## 1. Quais estados são mantidos
 
@@ -46,7 +46,6 @@ O código foi dividido em três arquivos com responsabilidades bem distintas:
 - **`biblioteca.h`**: contém apenas as definições de estado (structs) e as assinaturas das funções — nenhuma lógica.
 - **`biblioteca.c`**: contém toda a lógica de negócio (as seis operações da Etapa 1, mais as funções auxiliares de busca e contagem). Esse arquivo não sabe nada sobre menus, entrada de teclado ou impressão — ele só manipula o estado da `Biblioteca`.
 - **`main.c`**: é a camada de interação com o usuário (menu de console). Cada opção do menu tem seu próprio subprograma (`opcao_cadastrar_livro`, `opcao_emprestar_livro`, etc.), que só se preocupa em ler dados do teclado, chamar a função correspondente de `biblioteca.c` e exibir o resultado.
-- **`validacao.c`**: é um programa separado, independente de `main.c`, que reaproveita `biblioteca.c`/`biblioteca.h` para rodar os 15 casos de teste da Etapa 2 e relatar quantos passaram.
 
 Essa separação em subprogramas pequenos e de responsabilidade única (uma função por regra, uma função por operação de menu) foi a principal técnica de decomposição usada, em vez de qualquer forma de encapsulamento orientado a objetos.
 
@@ -58,3 +57,31 @@ Essa separação em subprogramas pequenos e de responsabilidade única (uma fun�
 - A comunicação entre os subprogramas se dá por **parâmetros e valores de retorno simples** (ponteiros para o estado, códigos de resultado inteiros, parâmetros de saída como `titulos_saida` e `*quantidade`), técnica típica de C imperativo — sem uso de exceções, callbacks ou qualquer mecanismo de mais alto nível.
 
 Por esses motivos, a solução expressa diretamente o modelo de computação imperativo: um programa é uma sequência de comandos que leem e escrevem em um estado compartilhado e mutável, controlada por estruturas de controle explícitas.
+
+## 7. Validação dos Casos da Etapa 2
+
+Os casos de teste definidos na Etapa 2 serviram como referência analítica para validar o comportamento computacional do sistema de empréstimo de livros implementado no paradigma imperativo.
+
+### 7.1 Casos Normais
+
+* **NORM-01 (Cadastro de livro):** Atendido. A rotina `cadastrar_livro` recorre a `buscar_indice_livro` para atestar a inexistência prévia do identificador; após a validação da capacidade em `MAX_LIVROS`, o registo é copiado para o vetor `livros[]` e `num_livros` é incrementado[cite: 1, 2].
+* **NORM-02 (Cadastro de utilizador):** Atendido. A função `cadastrar_usuario` verifica a unicidade do código via `buscar_indice_usuario` e insere o novo registo na posição `num_usuarios`, incrementando o respetivo contador[cite: 1, 2].
+* **NORM-03 (Empréstimo padrão):** Atendido. O procedimento `emprestar_livro` valida a presença do exemplar e do leitor, confirma que `copias_disponiveis > 0`, decrementa o stock no vetor de livros e acrescenta uma entrada com `ativo = 1` em `emprestimos[]`[cite: 1, 2].
+* **NORM-04 (Consulta de disponibilidade):** Atendido. A função `consultar_disponibilidade` pesquisa a posição do volume no vetor e retorna diretamente o valor do campo `copias_disponiveis` sem produzir efeitos colaterais[cite: 1, 2].
+* **NORM-05 (Consulta de empréstimos ativos):** Atendido. O procedimento `consultar_emprestimos_usuario` itera sobre `emprestimos[]`, filtra as ocorrências associadas ao utilizador com `ativo == 1` e preenche o vetor de saída com os respetivos títulos[cite: 1, 2].
+* **NORM-06 (Devolução de livro):** Atendido. A rotina `devolver_livro` localiza o par correspondente em aberto no vetor de empréstimos, transita a flag de estado para `ativo = 0` e incrementa `copias_disponiveis` no acervo[cite: 1, 2].
+* **NORM-07 (Segundo empréstimo distinto):** Atendido. A função `contar_emprestimos_ativos` retorna `1`, permitindo a concessão do novo volume por se encontrar abaixo de `LIMITE_EMPRESTIMOS_POR_USUARIO`[cite: 1, 2].
+* **NORM-08 (Terceiro empréstimo no limite máximo):** Atendido. Ao computar `2` empréstimos prévios, o fluxo aceita a operação por não exceder estritamente o limite estabelecido de 3 títulos simultâneos[cite: 1, 2].
+* **NORM-09 (Múltiplos cadastros no acervo):** Atendido. Chamadas sequenciais a `cadastrar_livro` populam posições consecutivas em `livros[]`, mantendo a integridade individual de códigos e quantidades de cópias[cite: 1].
+* **NORM-10 (Consulta de utilizador sem empréstimos):** Atendido. O laço de varredura não identifica correspondências ativas, configurando o parâmetro de saída `*quantidade` com o valor zero[cite: 1, 2].
+
+### 7.2 Casos-limite
+
+* **LIM-01 (Limite de empréstimos excedido):** Atendido. A função `contar_emprestimos_ativos` contabiliza 3 contratos ativos; a guarda condicional na rotina `emprestar_livro` interrompe o processamento e devolve `ERRO_LIMITE_EMPRESTIMOS_ATINGIDO`[cite: 1, 2].
+* **LIM-02 (Livro sem cópias disponíveis):** Atendido. A verificação `copias_disponiveis <= 0` é avaliada antes de qualquer mutação de estado, retornando imediatamente `ERRO_LIVRO_INDISPONIVEL`[cite: 1, 2].
+* **LIM-03 (Duplicidade do mesmo título para o mesmo utilizador):** Atendido. A função auxiliar `usuario_possui_livro_ativo` analisa o histórico recente e aciona a interrupção da rotina com `ERRO_USUARIO_JA_POSSUI_TITULO`[cite: 1, 2].
+
+### 7.3 Casos de Entrada Inválida
+
+* **INV-01 (Livro inexistente no acervo):** Atendido. A função `buscar_indice_livro` devolve `-1` ao término do ciclo de pesquisa sequencial, culminando no retorno imediato de `ERRO_LIVRO_NAO_ENCONTRADO`[cite: 1, 2].
+* **INV-02 (Devolução sem empréstimo associado):** Atendido. A busca por um contrato em aberto contendo a chave combinada (utilizador, livro) falha em localizar um índice válido, disparando o retorno de `ERRO_EMPRESTIMO_NAO_ENCONTRADO` sem alterações nas cópias[cite: 1, 2].
