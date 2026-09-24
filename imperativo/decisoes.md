@@ -1,0 +1,60 @@
+# ETAPA 03 — Decisões de Implementação (Paradigma Imperativo)
+
+**Tag:** `[P4-ETAPA-03]`
+**Linguagem:** C
+**Arquivos:** `imperativo/biblioteca.h`, `imperativo/biblioteca.c`, `imperativo/main.c`, `imperativo/validacao.c`
+
+## 1. Quais estados são mantidos
+
+O estado central do sistema é concentrado na struct `Biblioteca`, que agrupa três coleções e seus respectivos contadores:
+
+- **Acervo de livros** (`livros[]`, `num_livros`): cada livro mantém `codigo`, `titulo` e `copias_disponiveis`. O campo `copias_disponiveis` é o estado mais volátil do sistema — muda a cada empréstimo e devolução.
+- **Usuários cadastrados** (`usuarios[]`, `num_usuarios`): cada usuário mantém `codigo` e `nome`. É um estado praticamente imutável após o cadastro.
+- **Empréstimos** (`emprestimos[]`, `num_emprestimos`): cada registro mantém `codigo_usuario`, `codigo_livro` e um flag `ativo`. Em vez de remover um empréstimo do vetor quando o livro é devolvido, o sistema apenas marca `ativo = 0`, preservando o histórico completo de operações — essa foi uma decisão deliberada para manter rastreabilidade sem precisar de estruturas de dados mais complexas (como listas encadeadas com remoção).
+
+## 2. Quais operações modificam estado
+
+| Operação | Estado modificado |
+|---|---|
+| `cadastrar_livro` | Adiciona um item a `livros[]`, incrementa `num_livros` |
+| `cadastrar_usuario` | Adiciona um item a `usuarios[]`, incrementa `num_usuarios` |
+| `emprestar_livro` | Decrementa `copias_disponiveis` do livro; adiciona um item a `emprestimos[]`, incrementa `num_emprestimos` |
+| `devolver_livro` | Incrementa `copias_disponiveis` do livro; altera `ativo` de 1 para 0 no registro de empréstimo correspondente |
+
+As operações de consulta (`consultar_disponibilidade`, `consultar_emprestimos_usuario`) são as únicas que **não** alteram nenhum estado — apenas leem a `Biblioteca` e retornam informações, o que foi uma escolha consciente para deixar claro, pelo próprio nome e assinatura da função, quais operações têm efeito colateral e quais não têm.
+
+## 3. Onde aparecem efeitos colaterais
+
+Os efeitos colaterais aparecem sempre que uma função recebe `Biblioteca *b` (ponteiro) e escreve diretamente em algum campo apontado por `b`, sem devolver um novo valor. Exemplos concretos:
+
+- Em `emprestar_livro`, a linha `b->livros[idx_livro].copias_disponiveis = b->livros[idx_livro].copias_disponiveis - 1;` altera o estado do acervo como consequência colateral de uma operação que, à primeira vista, "só registra um empréstimo".
+- Em `cadastrar_livro` e `cadastrar_usuario`, os contadores (`num_livros`, `num_usuarios`) são incrementados como efeito colateral do cadastro, e são esses contadores que definem até onde os vetores são considerados válidos nas buscas subsequentes.
+
+Essa é uma diferença central em relação ao paradigma funcional: aqui, a mesma chamada de função pode retornar valores diferentes em momentos diferentes, dependendo do estado atual da `Biblioteca`, porque o estado é compartilhado e mutável.
+
+## 4. Quais estruturas de controle foram escolhidas
+
+- **Laços `for`**: usados em todas as buscas sequenciais (`buscar_indice_livro`, `buscar_indice_usuario`, `contar_emprestimos_ativos`, etc.), já que o problema não exige nenhuma estrutura de dados mais sofisticada (como tabelas hash) dado o tamanho limitado do acervo.
+- **Estruturas `if` em cadeia com retorno antecipado**: usadas em todas as operações que têm pré-condições (ex.: `emprestar_livro` valida, em sequência, se o livro existe, se o usuário existe, se há cópia disponível, se o limite foi atingido e se o usuário já possui o título — retornando o código de erro correspondente assim que a primeira violação é encontrada). Essa abordagem deixa o contrato de regras da Etapa 1 diretamente visível no código, na mesma ordem em que foram descritas na especificação.
+- **`switch`**: usado em `mensagem_resultado` (para mapear cada código de erro a uma mensagem) e no laço principal de `main.c` (para direcionar a opção escolhida pelo usuário ao subprograma correspondente).
+- **Laço `while`**: usado em `main.c` para manter o menu interativo em execução até que o usuário escolha sair (variável de controle `continuar`).
+
+## 5. Como os subprogramas foram organizados
+
+O código foi dividido em três arquivos com responsabilidades bem distintas:
+
+- **`biblioteca.h`**: contém apenas as definições de estado (structs) e as assinaturas das funções — nenhuma lógica.
+- **`biblioteca.c`**: contém toda a lógica de negócio (as seis operações da Etapa 1, mais as funções auxiliares de busca e contagem). Esse arquivo não sabe nada sobre menus, entrada de teclado ou impressão — ele só manipula o estado da `Biblioteca`.
+- **`main.c`**: é a camada de interação com o usuário (menu de console). Cada opção do menu tem seu próprio subprograma (`opcao_cadastrar_livro`, `opcao_emprestar_livro`, etc.), que só se preocupa em ler dados do teclado, chamar a função correspondente de `biblioteca.c` e exibir o resultado.
+- **`validacao.c`**: é um programa separado, independente de `main.c`, que reaproveita `biblioteca.c`/`biblioteca.h` para rodar os 15 casos de teste da Etapa 2 e relatar quantos passaram.
+
+Essa separação em subprogramas pequenos e de responsabilidade única (uma função por regra, uma função por operação de menu) foi a principal técnica de decomposição usada, em vez de qualquer forma de encapsulamento orientado a objetos.
+
+## 6. Por que a solução pode ser considerada predominantemente imperativa
+
+- O estado do sistema (`Biblioteca` e seus vetores) é armazenado explicitamente em memória e alterado por **atribuições diretas** (`b->livros[i].copias_disponiveis = ...`), não por criação de novos valores imutáveis.
+- O **fluxo de controle** é determinado por decisões explícitas (`if`, `switch`, `for`, `while`) que o programador escreve passo a passo — não há recursão, funções de ordem superior, nem inferência declarativa de comportamento.
+- As **structs usadas (`Livro`, `Usuario`, `Emprestimo`, `Biblioteca`) não possuem métodos**: são apenas agrupamentos de dados manipulados por funções externas que recebem ponteiros. Isso evita qualquer aparência de encapsulamento orientado a objetos, que esconderia a manipulação direta do estado.
+- A comunicação entre os subprogramas se dá por **parâmetros e valores de retorno simples** (ponteiros para o estado, códigos de resultado inteiros, parâmetros de saída como `titulos_saida` e `*quantidade`), técnica típica de C imperativo — sem uso de exceções, callbacks ou qualquer mecanismo de mais alto nível.
+
+Por esses motivos, a solução expressa diretamente o modelo de computação imperativo: um programa é uma sequência de comandos que leem e escrevem em um estado compartilhado e mutável, controlada por estruturas de controle explícitas.
