@@ -206,10 +206,13 @@ Estão fora do escopo deste projeto:
 
 - [P4-ETAPA-01] Proposta e especificacao do problema — concluida
 - [P4-ETAPA-02] Contrato semantico e testes — concluida
+- [P4-ETAPA-03] Implementação imperativa - concluida
 
 ## Links
 
 - [Casos de Teste](testes/casos.md)
+- [Decisões de Implementação — Paradigma Imperativo](imperativo/decisoes.md)
+- [Código-fonte Imperativo (C)](imperativo/)
 
 ## Estrutura do Repositório
 
