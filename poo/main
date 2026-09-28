@@ -30,7 +30,7 @@ public class Main {
         EmprestimoNaoEncontradoException() { super("Nao ha emprestimo correspondente a essa devolucao."); }
     }
 
-    /** Categoria de erros lancados quando uma regra de emprestimo e violada. */
+ 
     static class EmprestimoRecusadoException extends BibliotecaException {
         EmprestimoRecusadoException(String mensagem) { super(mensagem); }
     }
