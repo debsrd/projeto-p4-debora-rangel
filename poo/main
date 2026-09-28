@@ -1,0 +1,395 @@
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+
+public class Main {
+
+    static class BibliotecaException extends Exception {
+        BibliotecaException(String mensagem) { super(mensagem); }
+    }
+
+    static class CadastroDuplicadoException extends BibliotecaException {
+        CadastroDuplicadoException(String mensagem) { super(mensagem); }
+    }
+
+    static class LivroNaoEncontradoException extends BibliotecaException {
+        LivroNaoEncontradoException() { super("Livro nao encontrado/cadastrado."); }
+    }
+
+    static class UsuarioNaoEncontradoException extends BibliotecaException {
+        UsuarioNaoEncontradoException() { super("Usuario nao encontrado/cadastrado."); }
+    }
+
+    static class EmprestimoNaoEncontradoException extends BibliotecaException {
+        EmprestimoNaoEncontradoException() { super("Nao ha emprestimo correspondente a essa devolucao."); }
+    }
+
+    /** Categoria de erros lancados quando uma regra de emprestimo e violada. */
+    static class EmprestimoRecusadoException extends BibliotecaException {
+        EmprestimoRecusadoException(String mensagem) { super(mensagem); }
+    }
+
+    static class LivroIndisponivelException extends EmprestimoRecusadoException {
+        LivroIndisponivelException() { super("O livro esta indisponivel no momento."); }
+    }
+
+    static class LimiteEmprestimosException extends EmprestimoRecusadoException {
+        LimiteEmprestimosException(int limite) {
+            super("O usuario atingiu o limite de " + limite + " livros emprestados.");
+        }
+    }
+
+    static class TituloJaEmprestadoException extends EmprestimoRecusadoException {
+        TituloJaEmprestadoException() { super("O usuario ja possui uma copia desse titulo emprestada."); }
+    }
+
+    static class Livro {
+        private final int codigo;
+        private final String titulo;
+        private int copiasDisponiveis;
+
+        Livro(int codigo, String titulo, int copias) {
+            if (copias < 0) {
+                throw new IllegalArgumentException("O numero de copias nao pode ser negativo.");
+            }
+            this.codigo = codigo;
+            this.titulo = titulo;
+            this.copiasDisponiveis = copias;
+        }
+
+        int getCodigo() { return codigo; }
+        String getTitulo() { return titulo; }
+        int getCopiasDisponiveis() { return copiasDisponiveis; }
+        boolean temCopiaDisponivel() { return copiasDisponiveis > 0; }
+
+        void retirarCopia() throws LivroIndisponivelException {
+            if (!temCopiaDisponivel()) {
+                throw new LivroIndisponivelException();
+            }
+            copiasDisponiveis--;
+        }
+
+        void devolverCopia() { copiasDisponiveis++; }
+    }
+
+    static class Emprestimo {
+        private final Livro livro;
+        private boolean ativo;
+
+        Emprestimo(Livro livro) throws LivroIndisponivelException {
+            livro.retirarCopia();
+            this.livro = livro;
+            this.ativo = true;
+        }
+
+        Livro getLivro() { return livro; }
+        boolean isAtivo() { return ativo; }
+
+        void encerrar() {
+            if (ativo) {
+                ativo = false;
+                livro.devolverCopia();
+            }
+        }
+    }
+
+    static class Usuario {
+        private final int codigo;
+        private final String nome;
+        private final List<Emprestimo> emprestimos = new ArrayList<>();
+
+        Usuario(int codigo, String nome) {
+            this.codigo = codigo;
+            this.nome = nome;
+        }
+
+        int getCodigo() { return codigo; }
+        String getNome() { return nome; }
+
+        List<Emprestimo> getEmprestimosAtivos() {
+            List<Emprestimo> ativos = new ArrayList<>();
+            for (Emprestimo e : emprestimos) {
+                if (e.isAtivo()) {
+                    ativos.add(e);
+                }
+            }
+            return Collections.unmodifiableList(ativos);
+        }
+
+        int quantidadeEmprestimosAtivos() { return getEmprestimosAtivos().size(); }
+
+        boolean possuiEmprestimoAtivoDe(Livro livro) {
+            for (Emprestimo e : emprestimos) {
+                if (e.isAtivo() && e.getLivro() == livro) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        void pegarEmprestado(Livro livro) throws LivroIndisponivelException {
+            emprestimos.add(new Emprestimo(livro));
+        }
+
+        void devolver(Livro livro) throws EmprestimoNaoEncontradoException {
+            for (Emprestimo e : emprestimos) {
+                if (e.isAtivo() && e.getLivro() == livro) {
+                    e.encerrar();
+                    return;
+                }
+            }
+            throw new EmprestimoNaoEncontradoException();
+        }
+    }
+
+    interface RegraEmprestimo {
+        void verificar(Usuario usuario, Livro livro) throws EmprestimoRecusadoException;
+    }
+
+    static class RegraLivroDisponivel implements RegraEmprestimo {
+        @Override
+        public void verificar(Usuario usuario, Livro livro) throws EmprestimoRecusadoException {
+            if (!livro.temCopiaDisponivel()) {
+                throw new LivroIndisponivelException();
+            }
+        }
+    }
+
+    static class RegraLimiteEmprestimos implements RegraEmprestimo {
+        private final int limite;
+
+        RegraLimiteEmprestimos(int limite) { this.limite = limite; }
+
+        @Override
+        public void verificar(Usuario usuario, Livro livro) throws EmprestimoRecusadoException {
+            if (usuario.quantidadeEmprestimosAtivos() >= limite) {
+                throw new LimiteEmprestimosException(limite);
+            }
+        }
+    }
+
+    static class RegraTituloNaoDuplicado implements RegraEmprestimo {
+        @Override
+        public void verificar(Usuario usuario, Livro livro) throws EmprestimoRecusadoException {
+            if (usuario.possuiEmprestimoAtivoDe(livro)) {
+                throw new TituloJaEmprestadoException();
+            }
+        }
+    }
+
+    static class Biblioteca {
+        static final int LIMITE_PADRAO = 3;
+
+        private final Map<Integer, Livro> acervo = new LinkedHashMap<>();
+        private final Map<Integer, Usuario> usuarios = new LinkedHashMap<>();
+        private final List<RegraEmprestimo> regras;
+
+        Biblioteca() { this(regrasPadrao()); }
+
+        Biblioteca(List<RegraEmprestimo> regras) {
+            this.regras = new ArrayList<>(regras);
+        }
+
+        static List<RegraEmprestimo> regrasPadrao() {
+            List<RegraEmprestimo> regras = new ArrayList<>();
+            regras.add(new RegraLivroDisponivel());
+            regras.add(new RegraLimiteEmprestimos(LIMITE_PADRAO));
+            regras.add(new RegraTituloNaoDuplicado());
+            return regras;
+        }
+
+        void cadastrarLivro(int codigo, String titulo, int copias) throws CadastroDuplicadoException {
+            if (acervo.containsKey(codigo)) {
+                throw new CadastroDuplicadoException("Ja existe um livro cadastrado com esse codigo.");
+            }
+            acervo.put(codigo, new Livro(codigo, titulo, copias));
+        }
+
+        void cadastrarUsuario(int codigo, String nome) throws CadastroDuplicadoException {
+            if (usuarios.containsKey(codigo)) {
+                throw new CadastroDuplicadoException("Ja existe um usuario cadastrado com esse codigo.");
+            }
+            usuarios.put(codigo, new Usuario(codigo, nome));
+        }
+
+        void emprestar(int codigoUsuario, int codigoLivro) throws BibliotecaException {
+            Livro livro = buscarLivro(codigoLivro);
+            Usuario usuario = buscarUsuario(codigoUsuario);
+            for (RegraEmprestimo regra : regras) {
+                regra.verificar(usuario, livro);
+            }
+            usuario.pegarEmprestado(livro);
+        }
+
+        void devolver(int codigoUsuario, int codigoLivro) throws BibliotecaException {
+            Livro livro = buscarLivro(codigoLivro);
+            Usuario usuario = buscarUsuario(codigoUsuario);
+            usuario.devolver(livro);
+        }
+
+        int consultarDisponibilidade(int codigoLivro) throws LivroNaoEncontradoException {
+            return buscarLivro(codigoLivro).getCopiasDisponiveis();
+        }
+
+        List<String> consultarEmprestimos(int codigoUsuario) throws UsuarioNaoEncontradoException {
+            List<String> titulos = new ArrayList<>();
+            for (Emprestimo e : buscarUsuario(codigoUsuario).getEmprestimosAtivos()) {
+                titulos.add(e.getLivro().getTitulo());
+            }
+            return titulos;
+        }
+
+        private Livro buscarLivro(int codigo) throws LivroNaoEncontradoException {
+            Livro livro = acervo.get(codigo);
+            if (livro == null) {
+                throw new LivroNaoEncontradoException();
+            }
+            return livro;
+        }
+
+        private Usuario buscarUsuario(int codigo) throws UsuarioNaoEncontradoException {
+            Usuario usuario = usuarios.get(codigo);
+            if (usuario == null) {
+                throw new UsuarioNaoEncontradoException();
+            }
+            return usuario;
+        }
+    }
+
+    private static final BufferedReader entrada = new BufferedReader(new InputStreamReader(System.in));
+
+    private static String lerLinha() {
+        try {
+            return entrada.readLine();
+        } catch (IOException e) {
+            return null;
+        }
+    }
+
+    private static int lerInteiro() {
+        String linha = lerLinha();
+        if (linha == null) {
+            return -1;
+        }
+        try {
+            return Integer.parseInt(linha.trim());
+        } catch (NumberFormatException e) {
+            return -1;
+        }
+    }
+
+    private static void exibirMenu() {
+        System.out.println("\n===== Sistema de Emprestimo de Livros da Biblioteca =====");
+        System.out.println("1. Cadastrar livro");
+        System.out.println("2. Cadastrar usuario");
+        System.out.println("3. Emprestar livro");
+        System.out.println("4. Devolver livro");
+        System.out.println("5. Consultar disponibilidade de um livro");
+        System.out.println("6. Consultar livros emprestados por um usuario");
+        System.out.println("0. Sair");
+        System.out.print("Escolha uma opcao: ");
+    }
+
+    public static void main(String[] args) {
+        Biblioteca biblioteca = new Biblioteca();
+        boolean continuar = true;
+
+        System.out.println("Sistema de Emprestimo de Livros - Biblioteca (POO)");
+        System.out.println("(estado mantido apenas em memoria durante a execucao)");
+
+        while (continuar) {
+            exibirMenu();
+            String linha = lerLinha();
+            if (linha == null) {
+                break;
+            }
+            int opcao;
+            try {
+                opcao = Integer.parseInt(linha.trim());
+            } catch (NumberFormatException e) {
+                opcao = -1;
+            }
+
+            try {
+                switch (opcao) {
+                    case 1: {
+                        System.out.print("Codigo do livro: ");
+                        int codLivro = lerInteiro();
+                        System.out.print("Titulo do livro: ");
+                        String titulo = lerLinha();
+                        System.out.print("Numero de copias: ");
+                        int copias = lerInteiro();
+                        biblioteca.cadastrarLivro(codLivro, titulo, copias);
+                        System.out.println(">> Operacao realizada com sucesso.");
+                        break;
+                    }
+                    case 2: {
+                        System.out.print("Codigo do usuario: ");
+                        int codUsuario = lerInteiro();
+                        System.out.print("Nome do usuario: ");
+                        String nome = lerLinha();
+                        biblioteca.cadastrarUsuario(codUsuario, nome);
+                        System.out.println(">> Operacao realizada com sucesso.");
+                        break;
+                    }
+                    case 3: {
+                        System.out.print("Codigo do usuario: ");
+                        int uEmp = lerInteiro();
+                        System.out.print("Codigo do livro: ");
+                        int lEmp = lerInteiro();
+                        biblioteca.emprestar(uEmp, lEmp);
+                        System.out.println(">> Operacao realizada com sucesso.");
+                        break;
+                    }
+                    case 4: {
+                        System.out.print("Codigo do usuario: ");
+                        int uDev = lerInteiro();
+                        System.out.print("Codigo do livro: ");
+                        int lDev = lerInteiro();
+                        biblioteca.devolver(uDev, lDev);
+                        System.out.println(">> Operacao realizada com sucesso.");
+                        break;
+                    }
+                    case 5: {
+                        System.out.print("Codigo do livro: ");
+                        int lCons = lerInteiro();
+                        int disponiveis = biblioteca.consultarDisponibilidade(lCons);
+                        System.out.println(">> O livro " + lCons + " possui " + disponiveis
+                                + " copia(s) disponivel(is).");
+                        break;
+                    }
+                    case 6: {
+                        System.out.print("Codigo do usuario: ");
+                        int uCons = lerInteiro();
+                        List<String> titulos = biblioteca.consultarEmprestimos(uCons);
+                        if (titulos.isEmpty()) {
+                            System.out.println(">> O usuario " + uCons
+                                    + " nao possui livros emprestados no momento.");
+                        } else {
+                            System.out.println(">> Livros emprestados ao usuario " + uCons + ":");
+                            for (String t : titulos) {
+                                System.out.println("   - " + t);
+                            }
+                        }
+                        break;
+                    }
+                    case 0:
+                        continuar = false;
+                        System.out.println("Encerrando o sistema. Ate mais!");
+                        break;
+                    default:
+                        System.out.println(">> Opcao invalida. Tente novamente.");
+                        break;
+                }
+            } catch (BibliotecaException | IllegalArgumentException e) {
+                System.out.println(">> " + e.getMessage());
+            }
+        }
+    }
+}
