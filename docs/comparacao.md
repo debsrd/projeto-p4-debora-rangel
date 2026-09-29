@@ -68,9 +68,9 @@ A diferença observada foi na forma de **verificar** um erro esperado: em C, bas
 
 ### Organização do código
 
-Em C, a organização é **por camada**, em arquivos separados: `biblioteca.h` (declarações), `biblioteca.c` (lógica), `main.c` (interação com o usuário), `validacao.c` (testes) — quatro arquivos com papéis bem distintos.
+Em C, a organização é **por camada**, em arquivos separados: `biblioteca.h` (declarações), `biblioteca.c` (lógica), `main.c` (interação com o usuário) — três arquivos com papéis bem distintos.
 
-Em Java, a organização é **por classe**, todas agrupadas dentro de `Main.java` (17 classes/interfaces de domínio) mais `Validacao.java` separado para os testes. A separação deixou de ser "por camada em arquivo" e passou a ser "por conceito em classe", ainda que fisicamente concentradas em poucos arquivos, por decisão de simplificar a entrega do repositório.
+Em Java, a organização é **por classe**, todas agrupadas dentro de `Main.java` (17 classes/interfaces de domínio). A separação deixou de ser "por camada em arquivo" e passou a ser "por conceito em classe", ainda que fisicamente concentradas em poucos arquivos, por decisão de simplificar a entrega do repositório.
 
 ### Complexidade
 
