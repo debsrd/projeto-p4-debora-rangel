@@ -209,6 +209,7 @@ Estão fora do escopo deste projeto:
 - [Decisões de Implementação — Paradigma Imperativo](imperativo/decisoes.md)
 - [Código-fonte Imperativo (C)](imperativo/)
 - [Código-fonte POO (JAVA)](poo/)
+- [Comparação entre imperativo e poo](docs/comparacao.md)
   
 ## Estrutura do Repositório
 
